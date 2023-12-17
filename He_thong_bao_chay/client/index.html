@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard</title>
+  <style>
+    html,
+    body {
+      margin: 0px 50px 50px;
+      font-family: "Roboto", sans-serif; 
+    }
+
+    .monitor_sensor {
+      height: 100px;
+      padding: 0px 0px 10px 0px;
+      width: 1470px;
+      margin: auto;
+      display: flex;
+    }
+
+    .humidity,
+    .temperature,
+    .mq2-value {
+      flex: 1;
+      display: flex;
+      text-align: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-direction: column;
+    }
+
+    .chart_sensor {
+      margin: auto;
+      width: 1450px;
+      padding: 30px 10px;
+      background-color: #b6b6b648;
+    }
+
+    .action_button {
+      justify-content: center;
+      display: flex;
+      margin: 60px auto;
+      gap: 50px;
+      align-items: center;
+    }
+
+    .action_button img {
+      height: 100px;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <script src="https://code.jquery.com/jquery-3.7.0.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+</head>
+
+<body>
+  <div class="container">
+    <div class="monitor_sensor">
+      <div class="humidity" id="humidity">
+        <div>Độ Ẩm (%)</div>
+        <div id="humi" style="font-size: 20px; font-weight: bold;"></div>
+      </div>
+      <div class="temperature" id="temperature">
+        <div>Nhiệt Độ (Độ)</div>
+        <div id="temp" style="font-size: 20px; font-weight: bold;"></div>
+      </div>
+      <div class="mq2-value" id="mq2-value">
+        <div>Giá trị cảm biến MQ2</div>
+        <div id="bright" style="font-size: 20px; font-weight: bold;"></div>
+      </div>
+    </div>
+    <div class="chart_sensor">
+      <canvas id="mychart"></canvas>
+    </div>
+    <div class="action_button">
+      
+      <img id="bellIMG" src="images/bell_off.png" />
+      <button class="button" id="bellon"> ON </button>
+      <button class="button" id="belloff"> OFF </button>
+      <img id="pumpIMG" src="images/pump_off.png" />
+      <button class="button" id="pumpon"> ON </button>
+      <button class="button" id="pumpoff"> OFF </button>
+      <img id="fanIMG" src="images/fan_off.png" />
+      <button class="button" id="fanon"> ON </button>
+      <button class="button" id="fanoff"> OFF </button>
+    </div>
+
+    <div style="font-size: 28px; text-align: center; margin-bottom: 30px; margin-top: 50px;"> Sensor History</div>
+    <table id="sensorTable" class="display" style="width:100%; ">
+      <thead>
+        <tr>
+          <th style="text-align: center;">id</th>
+          <th style="text-align: center;">device_id</th>
+          <th style="text-align: center;">humidity</th>
+          <th style="text-align: center;">temperature</th>
+          <th style="text-align: center;">mq2_value</th>
+          <th style="text-align: center;">time</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+    <div style="font-size: 28px; text-align: center; margin-bottom: 30px; margin-top: 50px;"> Action History</div>
+    <table id="actionTable" class="display" style="width:100%">
+      <thead>
+        <tr>
+          <th style="text-align: center;">id</th>
+          <th style="text-align: center;">device_id</th>
+          <th style="text-align: center;">status</th>
+          <th style="text-align: center;">time</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+  </div>
+  <script>
+    const colorTemp = ['#FFE6E6', '#FFCDCD', '#FFB3B3', '#FF9A9A', '#FF8080', '#FF6666', '#FF4D4D', '#FF3333', '#FF1A1A', '#FF0000'];
+    const colorHumi = ["#E3F2FD", "#BBDEFB", "#90CAF9", "#64B5F6", "#42A5F5", "#2196F3", "#1E88E5", "#1976D2", "#1565C0", "#0D47A1"];
+    const colorMq2Value = ["#FFFDE7", "#FFF9C4", "#FFF59D", "#FFF176", "#FFEE58", "#FFEB3B", "#FDD835", "#FBC02D", "#F9A825", "violet"];
+
+    webSocket = new WebSocket('ws://localhost:3000');
+    webSocket.onopen = () => console.log('WebSocket Connected');
+    webSocket.onclose = () => console.log('WebSocket Disconnected');
+    webSocket.onmessage = (event) => {
+      const message = event.data.split("|");
+      if (message[0] === "DHT11, MQ2") {
+        if (chart.data.datasets[0].data.length >= 10) {
+          chart.data.datasets[0].data.shift();
+          chart.data.datasets[1].data.shift();
+          chart.data.datasets[2].data.shift();
+          chart.data.labels.shift();
+        }
+        const time = (new Date()).toLocaleTimeString();
+        [month, day, year] = (new Date()).toLocaleDateString().split('/');
+
+
+        chart.data.datasets[0].data.push(message[1]);
+        chart.data.datasets[1].data.push(message[2]);
+        chart.data.datasets[2].data.push(message[3]);
+        chart.data.labels.push(time);
+        chart.update();
+
+        document.getElementById('humi').textContent = `${parseInt(message[1]).toFixed(1)} %`;
+        document.getElementById('temp').textContent = `${parseInt(message[2]).toFixed(1)} độ`;
+        document.getElementById('bright').textContent = `${parseInt(message[3]).toFixed(0)}`;
+
+        document.getElementById('temperature').style.background = colorTemp[parseInt(message[2] / 10)];
+        document.getElementById('humidity').style.background = colorHumi[parseInt(message[1] / 10)];
+        document.getElementById('mq2-value').style.background = colorMq2Value[parseInt(message[3] / 100)];
+
+        counter1++;
+        sensorTable.row
+          .add([
+            counter1,
+            message[0],
+            message[1],
+            message[2],
+            message[3],
+            year + '-' + month + '-' + day + ' ' + time,
+          ])
+          .draw(false);
+      }
+      else {
+        const pumpIMG = document.getElementById("pumpIMG");
+        const fanIMG = document.getElementById("fanIMG");
+        const bellIMG = document.getElementById("bellIMG");
+        if (message[0] == 'fan' && message[1] == 'on') {
+          fanIMG.src = "images/fan_on.gif";
+        }
+        else if(message[0] == 'fan' && message[1] == 'off') {
+          fanIMG.src = "images/fan_off.png";
+        }
+        if (message[0] == 'pump' && message[1] == 'on') {
+          pumpIMG.src = "images/pump_on.png";
+        }
+        else if (message[0] == 'pump' && message[1] == 'off') {
+          pumpIMG.src = "images/pump_off.png";
+        }
+        if (message[0] == 'bell' && message[1] == 'on') {
+          bellIMG.src = "images/bell_on.png";
+        }
+        else if (message[0] == 'bell' && message[1] == 'off') {
+          bellIMG.src = "images/bell_off.png";
+        }
+      }
+    };
+
+    document.getElementById("pumpon").addEventListener('click', () => {
+      const time = (new Date()).toLocaleTimeString();
+      [month, day, year] = (new Date()).toLocaleDateString().split('/');
+      counter2++;
+      actionTable.row
+        .add([
+          counter2,
+          "pump",
+          "on",
+          year + '-' + month + '-' + day + ' ' + time,
+        ])
+        .draw(false);
+      webSocket.send("pump|on");
+    });
+    document.getElementById("pumpoff").addEventListener('click', () => {
+      const time = (new Date()).toLocaleTimeString();
+      [month, day, year] = (new Date()).toLocaleDateString().split('/');
+      counter2++;
+      actionTable.row
+        .add([
+          counter2,
+          "pump",
+          "off",
+          year + '-' + month + '-' + day + ' ' + time,
+        ])
+        .draw(false);
+      webSocket.send("pump|off");
+    });
+    document.getElementById("fanon").addEventListener('click', () => {
+      const time = (new Date()).toLocaleTimeString();
+      [month, day, year] = (new Date()).toLocaleDateString().split('/');
+      counter2++;
+      actionTable.row
+        .add([
+          counter2,
+          "fan",
+          "on",
+          year + '-' + month + '-' + day + ' ' + time,
+        ])
+        .draw(false);
+      webSocket.send("fan|on");
+    });
+    document.getElementById("fanoff").addEventListener('click', () => {
+      const time = (new Date()).toLocaleTimeString();
+      [month, day, year] = (new Date()).toLocaleDateString().split('/');
+      counter2++;
+      actionTable.row
+        .add([
+          counter2,
+          "fan",
+          "off",
+          year + '-' + month + '-' + day + ' ' + time,
+        ])
+        .draw(false);
+      webSocket.send("fan|off");
+    });
+    document.getElementById("bellon").addEventListener('click', () => {
+      const time = (new Date()).toLocaleTimeString();
+      [month, day, year] = (new Date()).toLocaleDateString().split('/');
+      counter2++;
+      actionTable.row
+        .add([
+          counter2,
+          "bell",
+          "on",
+          year + '-' + month + '-' + day + ' ' + time,
+        ])
+        .draw(false);
+      webSocket.send("bell|on");
+    });
+    document.getElementById("belloff").addEventListener('click', () => {
+      const time = (new Date()).toLocaleTimeString();
+      [month, day, year] = (new Date()).toLocaleDateString().split('/');
+      counter2++;
+      actionTable.row
+        .add([
+          counter2,
+          "bell",
+          "off",
+          year + '-' + month + '-' + day + ' ' + time,
+        ])
+        .draw(false);
+      webSocket.send("bell|off");
+    });
+
+    var chart = new Chart('mychart', {
+      type: 'line',
+      data: {
+        datasets: [{
+          label: 'Độ ẩm',
+          data: [],
+          yAxisID: 'y',
+          borderColor: "#0D47A1",
+        },
+        {
+          label: 'Nhiệt độ',
+          data: [],
+          yAxisID: 'y',
+          borderColor: "#FF0000",
+        },
+        {
+          label: 'Giá trị cảm biến MQ2',
+          data: [],
+          yAxisID: 'y1',
+          borderColor: "violet",
+        },],
+        labels: []
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: {
+            display: true,
+          },
+          y: {
+            display: true,
+            position: 'left',
+            max: 100,
+            min: 0
+          },
+          y1: {
+            display: true,
+            position: 'right',
+            max: 5000,
+            min: 0
+          }
+        }
+      }
+    });
+
+    const sensorTable = new DataTable('#sensorTable');
+    const actionTable = new DataTable('#actionTable');
+    counter1 = 0;
+    counter2 = 0;
+
+    fetch("http://localhost:3000/sensor").then(response => response.json())
+      .then(data => {
+        data.forEach(element => {
+          counter1++;
+          sensorTable.row
+            .add([
+              element.id,
+              element.device_id,
+              element.humidity,
+              element.temperature,
+              element.mq2_value,
+              element.time,
+            ])
+            .draw(false);
+        });
+
+      })
+      .catch(error => {
+        console.error('Error:', error);
+      });
+    fetch("http://localhost:3000/action").then(response => response.json())
+      .then(data => {
+        data.forEach(element => {
+          counter2++;
+          actionTable.row
+            .add([
+              element.id,
+              element.device_id,
+              element.status,
+              element.time,
+            ])
+            .draw(false);
+        });
+
+      })
+      .catch(error => {
+        console.error('Error:', error);
+      });
+  </script>
+</body>
+
+</html>
